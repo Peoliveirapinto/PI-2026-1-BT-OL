@@ -103,6 +103,7 @@ namespace bluetooth_overlay
     std::optional<int> QueryBatteryByScanningPropertyKeys(HDEVINFO deviceInfoSet, SP_DEVINFO_DATA &devInfoData, std::wstring &diagnostic);
     std::optional<int> QueryBatteryFromWindowsProperties(HDEVINFO deviceInfoSet, SP_DEVINFO_DATA &devInfoData, std::wstring &diagnostic);
     std::unordered_map<std::wstring, AddressBatteryMatch> QueryBatteryByAddressFromAllPresentDevices();
+    bool IsStartedDevNode(const SP_DEVINFO_DATA &devInfoData);
     HANDLE OpenBluetoothLeHandle(const wchar_t *devicePath);
     std::wstring FormatBluetoothAddress(ULONGLONG address);
     std::wstring SnapshotKey(const DeviceSnapshot &snapshot);

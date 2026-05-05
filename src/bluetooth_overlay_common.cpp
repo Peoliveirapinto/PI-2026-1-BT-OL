@@ -1,5 +1,7 @@
 #include "bluetooth_overlay_common.hpp"
 
+#include <cfgmgr32.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -20,6 +22,7 @@
 #include <vector>
 
 #pragma comment(lib, "setupapi.lib")
+#pragma comment(lib, "cfgmgr32.lib")
 #pragma comment(lib, "bluetoothapis.lib")
 #pragma comment(lib, "bthprops.lib")
 #pragma comment(lib, "shell32.lib")
@@ -47,6 +50,18 @@ namespace bluetooth_overlay
             }
         };
     } // namespace
+
+    bool IsStartedDevNode(const SP_DEVINFO_DATA &devInfoData)
+    {
+        ULONG status = 0;
+        ULONG problem = 0;
+        if (CM_Get_DevNode_Status(&status, &problem, devInfoData.DevInst, 0) != CR_SUCCESS)
+        {
+            return false;
+        }
+
+        return (status & DN_STARTED) != 0;
+    }
 
     void DebugLog(const std::wstring &message)
     {
@@ -591,9 +606,9 @@ namespace bluetooth_overlay
 
         BLUETOOTH_DEVICE_SEARCH_PARAMS search = {};
         search.dwSize = sizeof(search);
-        search.fReturnAuthenticated = TRUE;
-        search.fReturnRemembered = TRUE;
         search.fReturnConnected = TRUE;
+        search.fReturnAuthenticated = FALSE;
+        search.fReturnRemembered = FALSE;
         search.fReturnUnknown = FALSE;
         search.fIssueInquiry = FALSE;
         search.cTimeoutMultiplier = 0;
@@ -610,6 +625,11 @@ namespace bluetooth_overlay
 
         do
         {
+            if (!info.fConnected)
+            {
+                continue;
+            }
+
             DeviceSnapshot snapshot = {};
             snapshot.deviceId = FormatBluetoothAddress(info.Address.ullLong);
             if (info.szName[0] != L'\0')

@@ -10,6 +10,12 @@ A small Win32 overlay that stays on top of the desktop and shows battery percent
 - Estimates health from observed drain behavior when the device does not expose a direct health metric.
 - Renders through a layered, click-through Win32 window so the UI thread stays cheap.
 
+## Requirements
+
+- **CMake** 3.15 or later
+- **Visual Studio 18** (MSVC) or equivalent C++ compiler
+- Windows 10 or later
+
 ## Build
 
 Use CMake with a Windows toolchain:

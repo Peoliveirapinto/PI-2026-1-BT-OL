@@ -37,6 +37,11 @@ namespace bluetooth_overlay
                     continue;
                 }
 
+                if (!IsStartedDevNode(devInfo))
+                {
+                    continue;
+                }
+
                 DeviceSnapshot snapshot = {};
                 snapshot.deviceId = QueryDeviceInstanceId(deviceInfoSet, devInfo);
                 if (snapshot.deviceId.empty())
