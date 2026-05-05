@@ -7,6 +7,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(BluetoothBatteryOverlay WIN32
     src/main.cpp
+    src/bluetooth_overlay_common.cpp
+    src/battery_history.cpp
+    src/bluetooth_monitor.cpp
+    src/overlay_window.cpp
 )
 
 target_compile_definitions(BluetoothBatteryOverlay PRIVATE
