@@ -1,49 +1,49 @@
-# Bluetooth Battery Overlay
+# Sobreposição de Bateria Bluetooth
 
-A small Win32 overlay that stays on top of the desktop and shows battery percentage, estimated remaining time, and a historical health estimate for Bluetooth LE devices that expose the standard Battery Service.
+Uma pequena sobreposição Win32 que fica sobre a área de trabalho e mostra a porcentagem de bateria, o tempo estimado restante e uma estimativa histórica de "saúde" para dispositivos Bluetooth LE que expõem o serviço padrão de Bateria.
 
-## What it does
+## Funcionalidades
 
-- Polls Bluetooth LE devices on a background thread.
-- Reads battery percentage through the GATT Battery Service (`0x180F`) and Battery Level characteristic (`0x2A19`).
-- Tracks discharge history per device and estimates remaining time.
-- Estimates health from observed drain behavior when the device does not expose a direct health metric.
-- Renders through a layered, click-through Win32 window so the UI thread stays cheap.
+- Consulta dispositivos Bluetooth LE em uma thread de segundo plano.
+- Lê a porcentagem da bateria através do serviço GATT Battery (`0x180F`) e da característica Battery Level (`0x2A19`).
+- Rastreia o histórico de descarga por dispositivo e estima o tempo restante.
+- Estima a "saúde" com base no comportamento de descarga observado quando o dispositivo não fornece uma métrica direta de integridade.
+- Renderiza por meio de uma janela Win32 em camadas com click-through, mantendo a thread de interface leve.
 
-## Requirements
+## Requisitos
 
-- **CMake** 3.15 or later
-- **Visual Studio 18** (MSVC) or equivalent C++ compiler
-- Windows 10 or later
+- **CMake** 3.15 ou posterior
+- **Visual Studio 18** (MSVC) ou compilador C++ equivalente
+- Windows 10 ou superior
 
-## Build
+## Compilação
 
-Use CMake with a Windows toolchain:
+Use o CMake com um toolchain do Windows:
 
 ```powershell
 cmake --preset windows-x64
 cmake --build --preset windows-x64
 ```
 
-## Notes
+## Observações
 
-- The overlay is intentionally minimal and optimized for idle screen use.
-- Easy close hotkeys: Ctrl+Shift+Q and Ctrl+Alt+Q.
-- Runtime toggle: Ctrl+Alt+T enables/disables click-through without restarting.
-- Tray icon menu (system tray): right-click for Reload now and Exit.
-- The current implementation targets Bluetooth LE devices that expose the standard battery GATT service. That is the most reliable native path on Windows without adding heavier runtime dependencies.
+- A sobreposição é intencionalmente minimalista e otimizada para uso em tela ociosa.
+- Atalhos fáceis para fechar: Ctrl+Shift+Q e Ctrl+Alt+Q.
+- Alternar em tempo de execução: Ctrl+Alt+T ativa/desativa o click-through sem reiniciar.
+- Menu do ícone na bandeja do sistema: clique com o botão direito para "Recarregar agora" e "Sair".
+- A implementação atual tem como alvo dispositivos Bluetooth LE que expõem o serviço GATT de bateria padrão. Esse é o caminho nativo mais confiável no Windows sem adicionar dependências de runtime mais pesadas.
 
-## Debug mode
+## Modo de depuração
 
-- Run with --debug to disable click-through and enable a normal window frame with a close button.
-- Run with --console to open a debug console and print refresh logs.
-- Per-device diagnostics are printed in debug console logs (discovery stage and battery read reason).
-- In the overlay, diagnostics are shown in each row when battery is unavailable or when running with --debug.
-- Battery lookup order is: LE GATT battery service -> Windows Bluetooth device property fallback.
-- If standard keys are empty, the app performs a numeric property-key scan fallback and reports the winning key in diagnostics.
-- Address-based sibling fallback now uses confidence scoring; weak key-scan values are logged as candidates but are not auto-applied.
+- Execute com `--debug` para desabilitar o click-through e habilitar uma janela normal com botão de fechar.
+- Execute com `--console` para abrir um console de depuração e imprimir logs de atualização.
+- Diagnósticos por dispositivo são impressos nos logs do console de depuração (etapa de descoberta e motivo da leitura da bateria).
+- Na sobreposição, diagnósticos são mostrados em cada linha quando a bateria não está disponível ou quando executado com `--debug`.
+- Ordem de busca da bateria: serviço GATT de bateria LE -> fallback para propriedade do dispositivo Bluetooth do Windows.
+- Se as chaves padrão estiverem vazias, o aplicativo realiza um fallback por varredura de chaves de propriedade numéricas e reporta a chave vencedora nos diagnósticos.
+- O fallback por endereço de dispositivos relacionados agora usa pontuação de confiança; valores fracos da varredura de chaves são registrados como candidatos, mas não são aplicados automaticamente.
 
-Examples:
+Exemplos:
 
 ```powershell
 build/windows-x64/Release/BluetoothBatteryOverlay.exe --debug
