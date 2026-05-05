@@ -1,6 +1,6 @@
-# Sobreposição de Bateria Bluetooth
+# Overlayde Bateria Bluetooth
 
-Uma pequena sobreposição Win32 que fica sobre a área de trabalho e mostra a porcentagem de bateria, o tempo estimado restante e uma estimativa histórica de "saúde" para dispositivos Bluetooth LE que expõem o serviço padrão de Bateria.
+Um pequeno overlay Win32 que fica sobre a área de trabalho e mostra a porcentagem de bateria, o tempo estimado restante e uma estimativa histórica de "saúde" para dispositivos Bluetooth LE que expõem o serviço padrão de Bateria.
 
 ## Funcionalidades
 
@@ -27,7 +27,7 @@ cmake --build --preset windows-x64
 
 ## Observações
 
-- A sobreposição é intencionalmente minimalista e otimizada para uso em tela ociosa.
+- O overlay é intencionalmente minimalista e otimizado para uso em tela ociosa.
 - Atalhos fáceis para fechar: Ctrl+Shift+Q e Ctrl+Alt+Q.
 - Alternar em tempo de execução: Ctrl+Alt+T ativa/desativa o click-through sem reiniciar.
 - Menu do ícone na bandeja do sistema: clique com o botão direito para "Recarregar agora" e "Sair".
