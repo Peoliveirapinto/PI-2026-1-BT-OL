@@ -59,6 +59,7 @@ namespace bluetooth_overlay
     {
         WNDCLASSEXW wc = {};
         wc.cbSize = sizeof(wc);
+        wc.style = CS_HREDRAW | CS_VREDRAW;
         wc.hInstance = GetModuleHandleW(nullptr);
         wc.lpfnWndProc = &OverlayWindow::WndProc;
         wc.lpszClassName = L"BluetoothBatteryOverlayWindow";
@@ -74,7 +75,7 @@ namespace bluetooth_overlay
             BuildWindowExStyle(),
             wc.lpszClassName,
             L"Bluetooth Battery Overlay",
-            options_.debugMode ? (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX) : WS_POPUP,
+            options_.debugMode ? WS_OVERLAPPEDWINDOW : (WS_POPUP | WS_THICKFRAME),
             0,
             0,
             kOverlayWidth,
@@ -228,19 +229,41 @@ namespace bluetooth_overlay
         }
 
         const int rowCount = static_cast<int>(std::max<size_t>(1, localSnapshot.size()));
-        const int height = kTitleHeight + (rowCount * kRowHeight) + kFooterHeight + (kPadding * 2);
-        const int width = kOverlayWidth;
+        const int requiredHeight = kTitleHeight + (rowCount * kRowHeight) + kVerticalGap + kFooterHeight + 32;
 
-        RECT workArea = {};
-        SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
-        const int x = workArea.right - width - 24;
-        const int y = workArea.top + 24;
+        int x, y, width, height;
 
-        UINT flags = SWP_NOSENDCHANGING | SWP_SHOWWINDOW;
-        if (clickThroughEnabled_)
+        if (!windowStateInitialized_)
         {
-            flags |= SWP_NOACTIVATE;
+            width = kOverlayWidth;
+            height = requiredHeight;
+
+            RECT workArea = {};
+            SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
+            x = workArea.right - width - 24;
+            y = workArea.top + 24;
+
+            windowStateInitialized_ = true;
+            lastWindowRect_ = { x, y, x + width, y + height };
         }
+        else
+        {
+            x = lastWindowRect_.left;
+            y = lastWindowRect_.top;
+            width = lastWindowRect_.right - lastWindowRect_.left;
+            
+            height = lastWindowRect_.bottom - lastWindowRect_.top;
+            if (height < requiredHeight) {
+                height = requiredHeight;
+            }
+        }
+
+        UINT flags = SWP_NOSENDCHANGING | SWP_NOZORDER | SWP_NOACTIVATE;
+        if (!options_.debugMode)
+        {
+            flags |= SWP_SHOWWINDOW;
+        }
+        
         SetWindowPos(hwnd_, HWND_TOPMOST, x, y, width, height, flags);
         InvalidateRect(hwnd_, nullptr, TRUE);
     }
@@ -278,21 +301,14 @@ namespace bluetooth_overlay
             return;
         }
 
-        RECT titleRect = {kPadding, kPadding, client.right - kPadding, kPadding + 28};
+        RECT titleRect = {kPadding, kPadding, client.right - 460, kPadding + 28};
         SelectObject(hdc, titleFont_);
-        DrawTextW(hdc, L"Bluetooth battery", -1, &titleRect, DT_SINGLELINE | DT_LEFT | DT_VCENTER);
+        DrawTextW(hdc, L"Bluetooth battery", -1, &titleRect, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_END_ELLIPSIS);
 
-        RECT hintRect = {client.right - 190, kPadding + 4, client.right - kPadding, kPadding + 24};
+        RECT hintRect = {client.right - 450, kPadding + 4, client.right - kPadding, kPadding + 24};
         SetTextColor(hdc, RGB(170, 178, 190));
         SelectObject(hdc, smallFont_);
-        if (options_.debugMode)
-        {
-            DrawTextW(hdc, L"Ctrl+Alt+Q quit | Ctrl+Alt+T toggle pass-through", -1, &hintRect, DT_SINGLELINE | DT_RIGHT | DT_VCENTER);
-        }
-        else
-        {
-            DrawTextW(hdc, L"Ctrl+Alt+Q quit | Ctrl+Alt+T toggle pass-through", -1, &hintRect, DT_SINGLELINE | DT_RIGHT | DT_VCENTER);
-        }
+        DrawTextW(hdc, L"Ctrl+Alt+Q quit | Ctrl+Alt+T toggle pass-through", -1, &hintRect, DT_SINGLELINE | DT_RIGHT | DT_VCENTER);
 
         int top = kTitleHeight;
         for (const auto &snapshot : localSnapshot)
@@ -328,43 +344,6 @@ namespace bluetooth_overlay
                 DrawTextW(hdc, L"n/a", -1, &percentRect, DT_SINGLELINE | DT_RIGHT | DT_VCENTER);
             }
 
-            RECT detailRect = {row.left + 16, row.top + 34, row.right - 16, row.bottom - 12};
-            SetTextColor(hdc, RGB(196, 202, 212));
-            SelectObject(hdc, smallFont_);
-
-            std::wstring detailText = L"Health ";
-            if (snapshot.healthPercent.has_value())
-            {
-                wchar_t buffer[32] = {};
-                StringCchPrintfW(buffer, 32, L"%.0f%%", *snapshot.healthPercent);
-                detailText += buffer;
-            }
-            else
-            {
-                detailText += L"tracking";
-            }
-
-            detailText += L"   Est. ";
-            if (snapshot.remainingMinutes.has_value())
-            {
-                detailText += FormatRemainingTime(*snapshot.remainingMinutes);
-            }
-            else
-            {
-                detailText += L"waiting for discharge history";
-            }
-
-            detailText += L"   Rate ";
-            detailText += FormatDrainRate(snapshot.drainRateMilliPercentPerHour);
-
-            if (!snapshot.diagnostic.empty() && (options_.debugMode || !snapshot.batteryPercent.has_value()))
-            {
-                detailText += L"   Diag ";
-                detailText += snapshot.diagnostic;
-            }
-
-            DrawTextW(hdc, detailText.c_str(), -1, &detailRect, DT_SINGLELINE | DT_LEFT | DT_END_ELLIPSIS);
-
             int barTop = row.bottom - 18;
             RECT barBack = {row.left + 16, barTop, row.right - 16, barTop + 8};
             HBRUSH barBackground = CreateSolidBrush(RGB(40, 46, 58));
@@ -397,7 +376,7 @@ namespace bluetooth_overlay
         RECT footerRect = {kPadding, client.bottom - kFooterHeight - 8, client.right - kPadding, client.bottom - 8};
         SetTextColor(hdc, RGB(155, 162, 174));
         SelectObject(hdc, smallFont_);
-        DrawTextW(hdc, L"Health is estimated from observed drain history when the device does not expose a direct health metric.", -1, &footerRect, DT_SINGLELINE | DT_LEFT | DT_END_ELLIPSIS);
+        DrawTextW(hdc, L"Health is estimated from observed drain history when the device does not expose a direct health metric.", -1, &footerRect, DT_WORDBREAK | DT_LEFT | DT_VCENTER);
     }
 
     void OverlayWindow::DrawStaticContent(HDC hdc, const RECT &client, const wchar_t *headline, const wchar_t *subline)
@@ -567,6 +546,18 @@ namespace bluetooth_overlay
         }
         case WM_ERASEBKGND:
             return 1;
+        case WM_SIZE:
+            if (windowStateInitialized_ && !inInternalPosUpdate_ && wParam != SIZE_MINIMIZED)
+            {
+                GetWindowRect(hwnd_, &lastWindowRect_);
+            }
+            return 0;
+        case WM_MOVE:
+            if (windowStateInitialized_ && !inInternalPosUpdate_)
+            {
+                GetWindowRect(hwnd_, &lastWindowRect_);
+            }
+            return 0;
         case WM_NCHITTEST:
             if (!clickThroughEnabled_)
             {

@@ -34,11 +34,12 @@ namespace bluetooth_overlay
     inline constexpr UINT_PTR kTrayMenuExitId = 2002;
     inline constexpr auto kRefreshInterval = std::chrono::seconds(15);
     inline constexpr int kOverlayAlpha = 232;
-    inline constexpr int kOverlayWidth = 460;
-    inline constexpr int kRowHeight = 64;
-    inline constexpr int kTitleHeight = 44;
-    inline constexpr int kFooterHeight = 28;
+    inline constexpr int kOverlayWidth = 700;
+    inline constexpr int kRowHeight = 80;
+    inline constexpr int kTitleHeight = 64;
+    inline constexpr int kFooterHeight = 60;
     inline constexpr int kPadding = 16;
+    inline constexpr int kVerticalGap = 64;
 
     inline const GUID kBluetoothLeDeviceInterfaceGuid = {0x781aee18, 0x7733, 0x4ce4, {0xad, 0xd0, 0x91, 0xf4, 0x1c, 0x67, 0xb5, 0x92}};
     inline const DEVPROPKEY kBluetoothBatteryCandidateKey1 = {{0x670245F9, 0x6E25, 0x4179, {0x85, 0xC1, 0x98, 0x1C, 0x33, 0xB9, 0xD3, 0xB7}}, 4};

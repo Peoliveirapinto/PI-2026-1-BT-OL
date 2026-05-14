@@ -42,6 +42,9 @@ namespace bluetooth_overlay
         std::vector<DeviceSnapshot> snapshot_;
         AppOptions options_;
         bool clickThroughEnabled_ = true;
+        bool windowStateInitialized_ = false;
+        bool inInternalPosUpdate_ = false;
+        RECT lastWindowRect_ = {};
         BatteryHistoryStore history_;
         BluetoothBatteryMonitor monitor_;
         HFONT titleFont_ = nullptr;
