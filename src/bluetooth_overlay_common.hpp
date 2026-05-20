@@ -44,6 +44,9 @@ namespace bluetooth_overlay
     inline const GUID kBluetoothLeDeviceInterfaceGuid = {0x781aee18, 0x7733, 0x4ce4, {0xad, 0xd0, 0x91, 0xf4, 0x1c, 0x67, 0xb5, 0x92}};
     inline const DEVPROPKEY kBluetoothBatteryCandidateKey1 = {{0x670245F9, 0x6E25, 0x4179, {0x85, 0xC1, 0x98, 0x1C, 0x33, 0xB9, 0xD3, 0xB7}}, 4};
     inline const DEVPROPKEY kBluetoothBatteryCandidateKey2 = {{0x80497100, 0x8C73, 0x48B9, {0xAA, 0xD9, 0xCE, 0x38, 0x7E, 0x19, 0xC5, 0x6E}}, 6};
+    inline const DEVPROPKEY kBluetoothBatteryCandidateKey3 = {{0x104EA319, 0x6EE2, 0x4701, {0xBD, 0x47, 0x8D, 0xDB, 0xF4, 0x25, 0xBB, 0xE5}}, 2};
+    inline const DEVPROPKEY kBluetoothBatteryCandidateKey4 = {{0x104EA319, 0x6EE2, 0x4701, {0xBD, 0x47, 0x8D, 0xDB, 0xF4, 0x25, 0xBB, 0x14}}, 2};
+    inline const DEVPROPKEY kBluetoothBatteryCandidateKey5 = {{0x104E17AB, 0x059A, 0x4876, {0xBD, 0x14, 0xBA, 0xF2, 0x8C, 0xA0, 0xA2, 0x2A}}, 2};
 
     struct DeviceSnapshot
     {
@@ -68,6 +71,7 @@ namespace bluetooth_overlay
         int confidence = 0;
         std::wstring source;
         std::wstring instanceId;
+        std::wstring name;
         std::vector<std::wstring> candidates;
     };
 
@@ -110,6 +114,7 @@ namespace bluetooth_overlay
     std::wstring SnapshotKey(const DeviceSnapshot &snapshot);
     std::optional<std::wstring> ExtractBluetoothAddressToken(const std::wstring &text);
     void RemoveBatteryUnavailableSuffix(std::wstring &name);
+    std::wstring NormalizeDeviceName(const std::wstring &name);
     std::vector<DeviceSnapshot> EnumerateClassicBluetoothDevices();
     BatteryQueryResult QueryBatteryLevel(HANDLE deviceHandle);
 

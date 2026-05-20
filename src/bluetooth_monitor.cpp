@@ -64,22 +64,32 @@ namespace bluetooth_overlay
                     snapshot.diagnostic = L"cannot open LE device interface";
                 }
 
-                if (!snapshot.batteryPercent.has_value())
+                if (!snapshot.batteryPercent.has_value() || *snapshot.batteryPercent == 0)
                 {
                     std::wstring propertyDiagnostic;
                     auto propertyBattery = QueryBatteryFromWindowsProperties(deviceInfoSet, devInfo, propertyDiagnostic);
-                    if (propertyBattery.has_value())
+                    
+                    // Only use fallback if it gave us a value, and if we previously had 0, only if the fallback is > 0
+                    bool useFallback = propertyBattery.has_value();
+                    if (useFallback && snapshot.batteryPercent.has_value() && *snapshot.batteryPercent == 0) {
+                        if (*propertyBattery == 0) useFallback = false;
+                    }
+
+                    if (useFallback)
                     {
                         snapshot.batteryPercent = propertyBattery;
                         snapshot.diagnostic = propertyDiagnostic;
                     }
-                    else if (snapshot.diagnostic.empty())
+                    else if (!snapshot.batteryPercent.has_value())
                     {
-                        snapshot.diagnostic = L"battery value unavailable";
-                    }
-                    else
-                    {
-                        snapshot.diagnostic += L"; windows property fallback not available";
+                        if (snapshot.diagnostic.empty())
+                        {
+                            snapshot.diagnostic = L"battery value unavailable";
+                        }
+                        else
+                        {
+                            snapshot.diagnostic += L"; windows property fallback not available";
+                        }
                     }
                 }
 
@@ -131,17 +141,26 @@ namespace bluetooth_overlay
             }
         }
 
+        std::unordered_set<std::wstring> usedAddresses;
+
         for (auto &snapshot : snapshots)
         {
-            if (snapshot.batteryPercent.has_value())
-            {
-                continue;
-            }
-
             auto address = ExtractBluetoothAddressToken(snapshot.deviceId);
             if (!address.has_value())
             {
                 address = ExtractBluetoothAddressToken(snapshot.name);
+            }
+
+            if (address.has_value())
+            {
+                usedAddresses.insert(*address);
+            }
+
+            // If we have a value and it's > 0, we are happy. 
+            // If it's 0, we might want to check the address-based fallback to see if there's a better one.
+            if (snapshot.batteryPercent.has_value() && *snapshot.batteryPercent > 0)
+            {
+                continue;
             }
 
             if (!address.has_value())
@@ -156,20 +175,81 @@ namespace bluetooth_overlay
             }
 
             const AddressBatteryMatch &match = it->second;
-            if (match.confidence >= 2)
+            // Overwrite if we have no value, OR if our current value is 0 and the match is > 0
+            bool shouldOverwrite = !snapshot.batteryPercent.has_value();
+            if (!shouldOverwrite && *snapshot.batteryPercent == 0 && match.value > 0) {
+                shouldOverwrite = true;
+            }
+
+            if (shouldOverwrite && match.confidence >= 1)
             {
                 snapshot.batteryPercent = match.value;
                 snapshot.diagnostic = L"windows sibling fallback by bluetooth address | source=" + match.source +
                                       L" | value=" + std::to_wstring(match.value) + L"%";
                 RemoveBatteryUnavailableSuffix(snapshot.name);
             }
-            else
+            else if (!snapshot.batteryPercent.has_value())
             {
                 snapshot.diagnostic = L"weak sibling candidates for address " + *address +
                                       L" | best=" + std::to_wstring(match.value) + L"% from " + match.source +
                                       L" | candidates=" + std::to_wstring(match.candidates.size());
             }
         }
+
+        for (const auto &[address, match] : batteryByAddress)
+        {
+            if (usedAddresses.find(address) == usedAddresses.end() && match.value > 0)
+            {
+                bool merged = false;
+                std::wstring normMatch = NormalizeDeviceName(match.name);
+                for (auto &snapshot : snapshots) {
+                    std::wstring normSnap = NormalizeDeviceName(snapshot.name);
+                    if (normSnap == normMatch) {
+                        if (!snapshot.batteryPercent.has_value() || *snapshot.batteryPercent == 0) {
+                            snapshot.batteryPercent = match.value;
+                            snapshot.diagnostic = L"windows property fallback by name match | " + match.source;
+                            RemoveBatteryUnavailableSuffix(snapshot.name);
+                            merged = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!merged) {
+                    DeviceSnapshot newSnap = {};
+                    newSnap.deviceId = match.instanceId;
+                    newSnap.name = match.name;
+                    newSnap.batteryPercent = match.value;
+                    newSnap.diagnostic = L"windows property device | " + match.source;
+                    snapshots.push_back(std::move(newSnap));
+                }
+            }
+        }
+
+        // Final deduplication and name cleaning
+        std::vector<DeviceSnapshot> finalSnapshots;
+        std::unordered_map<std::wstring, size_t> nameToIndex;
+
+        for (auto &snap : snapshots) {
+            std::wstring norm = NormalizeDeviceName(snap.name);
+            auto it = nameToIndex.find(norm);
+            if (it != nameToIndex.end()) {
+                auto &existing = finalSnapshots[it->second];
+                // Merge if existing has no battery or 0 battery and new one has > 0
+                if ((!existing.batteryPercent.has_value() || *existing.batteryPercent == 0) && 
+                    (snap.batteryPercent.has_value() && *snap.batteryPercent > 0)) {
+                    existing.batteryPercent = snap.batteryPercent;
+                    existing.diagnostic = snap.diagnostic;
+                }
+            } else {
+                nameToIndex[norm] = finalSnapshots.size();
+                // Clean name before adding
+                snap.name = norm;
+                finalSnapshots.push_back(std::move(snap));
+            }
+        }
+
+        snapshots = std::move(finalSnapshots);
 
         history_.UpdateAndPersist(snapshots);
         history_.ApplyStoredAverages(snapshots);

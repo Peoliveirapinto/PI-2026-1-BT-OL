@@ -361,12 +361,12 @@ namespace bluetooth_overlay
 
     std::optional<int> TryReadNumericPercentProperty(HDEVINFO deviceInfoSet, SP_DEVINFO_DATA &devInfoData, const DEVPROPKEY &key)
     {
-        if (auto byteValue = TryReadByteDeviceProperty(deviceInfoSet, devInfoData, key); byteValue.has_value() && *byteValue > 0)
+        if (auto byteValue = TryReadByteDeviceProperty(deviceInfoSet, devInfoData, key); byteValue.has_value() && *byteValue >= 0)
         {
             return byteValue;
         }
 
-        if (auto dwordValue = TryReadUint32DeviceProperty(deviceInfoSet, devInfoData, key); dwordValue.has_value() && *dwordValue > 0)
+        if (auto dwordValue = TryReadUint32DeviceProperty(deviceInfoSet, devInfoData, key); dwordValue.has_value() && *dwordValue >= 0)
         {
             return dwordValue;
         }
@@ -394,7 +394,11 @@ namespace bluetooth_overlay
         for (DWORD i = 0; i < keyCount; ++i)
         {
             const DEVPROPKEY &key = keys[i];
-            if (IsSameDevPropKey(key, kBluetoothBatteryCandidateKey1) || IsSameDevPropKey(key, kBluetoothBatteryCandidateKey2))
+            if (IsSameDevPropKey(key, kBluetoothBatteryCandidateKey1) || 
+                IsSameDevPropKey(key, kBluetoothBatteryCandidateKey2) ||
+                IsSameDevPropKey(key, kBluetoothBatteryCandidateKey3) ||
+                IsSameDevPropKey(key, kBluetoothBatteryCandidateKey4) ||
+                IsSameDevPropKey(key, kBluetoothBatteryCandidateKey5))
             {
                 continue;
             }
@@ -423,16 +427,32 @@ namespace bluetooth_overlay
 
     std::optional<int> QueryBatteryFromWindowsProperties(HDEVINFO deviceInfoSet, SP_DEVINFO_DATA &devInfoData, std::wstring &diagnostic)
     {
-        if (auto value = TryReadNumericPercentProperty(deviceInfoSet, devInfoData, kBluetoothBatteryCandidateKey1); value.has_value())
-        {
-            diagnostic = L"windows property fallback {670245F9...} pid 4";
-            return value;
+        const struct Candidate {
+            const DEVPROPKEY* key;
+            const wchar_t* label;
+        } candidates[] = {
+            { &kBluetoothBatteryCandidateKey1, L"{670245F9...} pid 4" },
+            { &kBluetoothBatteryCandidateKey2, L"{80497100...} pid 6" },
+            { &kBluetoothBatteryCandidateKey3, L"{104EA319...} pid 2 (BBE5)" },
+            { &kBluetoothBatteryCandidateKey4, L"{104EA319...} pid 2 (BB14)" },
+            { &kBluetoothBatteryCandidateKey5, L"{104E17AB...} pid 2" },
+        };
+
+        std::optional<int> bestValue;
+        std::wstring bestLabel;
+
+        for (const auto& candidate : candidates) {
+            if (auto value = TryReadNumericPercentProperty(deviceInfoSet, devInfoData, *candidate.key); value.has_value()) {
+                if (!bestValue.has_value() || *value > *bestValue) {
+                    bestValue = value;
+                    bestLabel = candidate.label;
+                }
+            }
         }
 
-        if (auto value = TryReadNumericPercentProperty(deviceInfoSet, devInfoData, kBluetoothBatteryCandidateKey2); value.has_value())
-        {
-            diagnostic = L"windows property fallback {80497100...} pid 6";
-            return value;
+        if (bestValue.has_value()) {
+            diagnostic = std::wstring(L"windows property fallback ") + bestLabel;
+            return bestValue;
         }
 
         if (auto value = QueryBatteryByScanningPropertyKeys(deviceInfoSet, devInfoData, diagnostic); value.has_value())
@@ -477,14 +497,20 @@ namespace bluetooth_overlay
                 continue;
             }
 
+            std::wstring name = QueryDeviceName(allDevices.value, devInfo);
+
             AddressBatteryMatch &match = values[*address];
             std::wstring candidate = std::to_wstring(*battery) + L"% from " + diagnostic;
             match.candidates.push_back(candidate);
 
             const int confidence = BatteryDiagnosticConfidence(diagnostic);
+            
+            // Priority:
+            // 1. Higher value (since we already ignore 0 in TryReadNumericPercentProperty)
+            // 2. Higher confidence source
             const bool replaceCurrent = (match.value < 0) ||
-                                        (confidence > match.confidence) ||
-                                        (confidence == match.confidence && *battery > match.value);
+                                        (*battery > match.value) ||
+                                        (confidence > match.confidence && *battery == match.value);
 
             if (replaceCurrent)
             {
@@ -492,6 +518,7 @@ namespace bluetooth_overlay
                 match.confidence = confidence;
                 match.source = diagnostic;
                 match.instanceId = instanceId;
+                match.name = name;
             }
         }
 
@@ -598,6 +625,38 @@ namespace bluetooth_overlay
         {
             name.resize(name.size() - suffix.size());
         }
+    }
+
+    std::wstring NormalizeDeviceName(const std::wstring &name)
+    {
+        std::wstring n = name;
+        
+        // Remove common suffixes
+        const std::wstring suffixes[] = { 
+            L" (classic)", 
+            L" (battery unavailable)", 
+            L" Hands-Free AG", 
+            L" Hands-Free", 
+            L" Avrcp Transport",
+            L" Stereo"
+        };
+
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (const auto& s : suffixes) {
+                if (n.size() >= s.size() && n.compare(n.size() - s.size(), s.size(), s) == 0) {
+                    n.resize(n.size() - s.size());
+                    changed = true;
+                }
+            }
+        }
+
+        // Trim
+        size_t first = n.find_first_not_of(L" ");
+        if (std::wstring::npos == first) return n;
+        size_t last = n.find_last_not_of(L" ");
+        return n.substr(first, (last - first + 1));
     }
 
     std::vector<DeviceSnapshot> EnumerateClassicBluetoothDevices()
@@ -721,7 +780,7 @@ namespace bluetooth_overlay
                 {
                     USHORT valueSize = 0;
                     hr = BluetoothGATTGetCharacteristicValue(deviceHandle, &characteristicCopy, 0, nullptr, &valueSize, readMode);
-                    if (hr != HRESULT_FROM_WIN32(ERROR_MORE_DATA) || valueSize < sizeof(BTH_LE_GATT_CHARACTERISTIC_VALUE))
+                    if (hr != HRESULT_FROM_WIN32(ERROR_MORE_DATA) || valueSize < (FIELD_OFFSET(BTH_LE_GATT_CHARACTERISTIC_VALUE, Data) + 1))
                     {
                         lastReadFailure = hr;
                         continue;
