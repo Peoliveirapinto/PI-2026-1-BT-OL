@@ -1,4 +1,4 @@
-# Overlayde Bateria Bluetooth
+# Overlay de Bateria Bluetooth
 
 Um pequeno overlay Win32 que fica sobre a área de trabalho e mostra a porcentagem de bateria, o tempo estimado restante e uma estimativa histórica de "saúde" para dispositivos Bluetooth LE que expõem o serviço padrão de Bateria.
 
