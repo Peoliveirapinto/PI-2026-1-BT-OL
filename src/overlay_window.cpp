@@ -326,12 +326,42 @@ namespace bluetooth_overlay
             SelectObject(hdc, oldRowPen);
             DeleteObject(rowPen);
 
-            RECT nameRect = {row.left + 16, row.top + 10, row.right - 100, row.top + 34};
+            RECT nameRect = {row.left + 16, row.top + 10, row.right - 100, row.top + 32};
             SetTextColor(hdc, RGB(246, 248, 252));
             SelectObject(hdc, bodyFont_);
             DrawTextW(hdc, snapshot.name.c_str(), -1, &nameRect, DT_SINGLELINE | DT_LEFT | DT_END_ELLIPSIS);
 
-            RECT percentRect = {row.right - 92, row.top + 10, row.right - 16, row.top + 32};
+            std::wstring subtitle;
+            if (snapshot.batteryPercent.has_value())
+            {
+                if (snapshot.remainingMinutes.has_value() && *snapshot.remainingMinutes > 0.0)
+                {
+                    subtitle += L"Remaining: " + FormatRemainingTime(*snapshot.remainingMinutes);
+                }
+                else
+                {
+                    subtitle += L"Remaining: calculating...";
+                }
+
+                if (snapshot.healthPercent.has_value())
+                {
+                    if (!subtitle.empty())
+                    {
+                        subtitle += L"  |  ";
+                    }
+                    subtitle += L"Health: " + FormatPercent(static_cast<int>(*snapshot.healthPercent));
+                }
+            }
+
+            if (!subtitle.empty())
+            {
+                RECT subtitleRect = {row.left + 16, row.top + 34, row.right - 100, row.top + 54};
+                SetTextColor(hdc, RGB(155, 162, 174));
+                SelectObject(hdc, smallFont_);
+                DrawTextW(hdc, subtitle.c_str(), -1, &subtitleRect, DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_END_ELLIPSIS);
+            }
+
+            RECT percentRect = {row.right - 92, row.top + 10, row.right - 16, row.top + 54};
             SetTextColor(hdc, RGB(160, 235, 180));
             SelectObject(hdc, titleFont_);
             if (snapshot.batteryPercent.has_value())

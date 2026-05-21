@@ -35,7 +35,7 @@ namespace bluetooth_overlay
     inline constexpr auto kRefreshInterval = std::chrono::seconds(15);
     inline constexpr int kOverlayAlpha = 232;
     inline constexpr int kOverlayWidth = 700;
-    inline constexpr int kRowHeight = 80;
+    inline constexpr int kRowHeight = 96;
     inline constexpr int kTitleHeight = 64;
     inline constexpr int kFooterHeight = 60;
     inline constexpr int kPadding = 16;
