@@ -39,32 +39,54 @@ namespace bluetooth_overlay
             if (percent < stats.lastPercent)
             {
                 const uint64_t elapsedSeconds = now > stats.lastSampleUnixSeconds ? now - stats.lastSampleUnixSeconds : 0;
-                const double elapsedHours = std::max(1.0 / 60.0, static_cast<double>(elapsedSeconds) / 3600.0);
-                const double drainRate = static_cast<double>(stats.lastPercent - percent) / elapsedHours;
-                const int64_t drainRateMilli = static_cast<int64_t>(std::llround(drainRate * 1000.0));
+                const uint64_t MIN_SAMPLE_INTERVAL_SECONDS = 300;
 
-                if (drainRateMilli > 0)
+                if (elapsedSeconds < MIN_SAMPLE_INTERVAL_SECONDS)
                 {
-                    if (stats.baselineDrainRateMilliPercentPerHour == 0 || drainRateMilli < stats.baselineDrainRateMilliPercentPerHour)
-                    {
-                        stats.baselineDrainRateMilliPercentPerHour = drainRateMilli;
-                    }
-
-                    if (stats.ewmaDrainRateMilliPercentPerHour == 0)
-                    {
-                        stats.ewmaDrainRateMilliPercentPerHour = drainRateMilli;
-                    }
-                    else
-                    {
-                        stats.ewmaDrainRateMilliPercentPerHour = (stats.ewmaDrainRateMilliPercentPerHour * 85 + drainRateMilli * 15) / 100;
-                    }
-
-                    stats.sampleCount += 1;
+                    // Ignora a medição de taxa para evitar ruídos, apenas atualiza o percentual atual
+                    stats.lastPercent = percent;
                 }
+                else
+                {
+                    const double elapsedHours = std::max(1.0 / 60.0, static_cast<double>(elapsedSeconds) / 3600.0);
+                    const double drainRate = static_cast<double>(stats.lastPercent - percent) / elapsedHours;
+                    const int64_t drainRateMilli = static_cast<int64_t>(std::llround(drainRate * 1000.0));
 
-                stats.lastPercent = percent;
-                stats.lastSampleUnixSeconds = now;
-                stats.hasSample = true;
+                    if (drainRateMilli > 0)
+                    {
+                        const int64_t MIN_ACTIVE_DRAIN_MILLI = 500;
+                        if (drainRateMilli >= MIN_ACTIVE_DRAIN_MILLI)
+                        {
+                            if (stats.baselineDrainRateMilliPercentPerHour == 0)
+                            {
+                                stats.baselineDrainRateMilliPercentPerHour = drainRateMilli;
+                            }
+                            else if (drainRateMilli < stats.baselineDrainRateMilliPercentPerHour)
+                            {
+                                stats.baselineDrainRateMilliPercentPerHour = drainRateMilli;
+                            }
+                            else
+                            {
+                                stats.baselineDrainRateMilliPercentPerHour = (stats.baselineDrainRateMilliPercentPerHour * 999 + drainRateMilli * 1) / 1000;
+                            }
+                        }
+
+                        if (stats.ewmaDrainRateMilliPercentPerHour == 0)
+                        {
+                            stats.ewmaDrainRateMilliPercentPerHour = drainRateMilli;
+                        }
+                        else
+                        {
+                            stats.ewmaDrainRateMilliPercentPerHour = (stats.ewmaDrainRateMilliPercentPerHour * 85 + drainRateMilli * 15) / 100;
+                        }
+
+                        stats.sampleCount += 1;
+                    }
+
+                    stats.lastPercent = percent;
+                    stats.lastSampleUnixSeconds = now;
+                    stats.hasSample = true;
+                }
             }
             else if (percent > stats.lastPercent)
             {
